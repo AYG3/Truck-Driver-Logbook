@@ -25,7 +25,7 @@ DATABASES = {
     )
 }
 
-# Celery - Use Render's Redis URL
+# Celery - Upstash's Redis URL
 CELERY_BROKER_URL = os.environ.get('REDIS_URL', 'redis://localhost:6379/0')
 CELERY_RESULT_BACKEND = os.environ.get('REDIS_URL', 'redis://localhost:6379/0')
 
@@ -41,8 +41,8 @@ SECURE_BROWSER_XSS_FILTER = True
 SECURE_CONTENT_TYPE_NOSNIFF = True
 X_FRAME_OPTIONS = 'DENY'
 
-# CORS - Update with your frontend domain
+# CORS - frontend domain
 CORS_ALLOWED_ORIGINS = os.environ.get(
     'CORS_ALLOWED_ORIGINS',
-    'https://yourdomain.com'
+    'https://truck-driver-logbook.vercel.app/'
 ).split(',')
