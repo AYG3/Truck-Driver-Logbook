@@ -152,6 +152,12 @@ CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
 
+# ============================================================================
+# STATIC FILES CONFIGURATION
+# ============================================================================
+
+STATIC_URL = '/static/'
+STATIC_ROOT = BASE_DIR / 'staticfiles'
 
 # ============================================================================
 # LOGGING CONFIGURATION
