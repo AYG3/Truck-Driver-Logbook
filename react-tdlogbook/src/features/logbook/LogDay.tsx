@@ -3,6 +3,7 @@ import { LogCanvas } from "./LogCanvas";
 import { LogRemarks } from "./LogRemarks";
 import { LogTotals } from "./LogTotals";
 import type { LogDay as LogDayType } from "../../types/log";
+import { LogSummaryTable } from "./LogSummaryTable";
 
 interface LogDayProps {
   logDay: LogDayType;
@@ -24,7 +25,7 @@ interface LogDayProps {
  */
 export function LogDay({ logDay, driverName, truckNumber, carrier }: LogDayProps) {
   return (
-    <div className="bg-white border border-gray-300 rounded-lg p-6 mb-8 shadow-sm print:shadow-none print:border-gray-400">
+    <div className="bg-white border border-gray-300 rounded-lg p-4 sm:p-6 mb-8 shadow-sm print:shadow-none print:border-gray-400">
       {/* Header Section */}
       <LogHeader
         date={logDay.date}
@@ -33,10 +34,16 @@ export function LogDay({ logDay, driverName, truckNumber, carrier }: LogDayProps
         carrier={carrier}
       />
 
-      {/* Time Grid (Canvas) - Horizontal scroll on small screens */}
-      <div className="my-6 overflow-x-auto">
-        <div className="min-w-[700px]">
+      {/* Time Grid (Canvas) + Summary Table - Stacks on mobile, side-by-side on desktop */}
+      <div className="flex flex-col lg:flex-row gap-4 mb-6">
+        {/* Canvas - Full width on mobile, flex-grow on desktop */}
+        <div className="w-full lg:flex-1 overflow-x-auto">
           <LogCanvas segments={logDay.segments} date={logDay.date} />
+        </div>
+        
+        {/* Summary Table - Full width on mobile, fixed width on desktop */}
+        <div className="w-full lg:w-64 lg:flex-shrink-0">
+          <LogSummaryTable segments={logDay.segments} />
         </div>
       </div>
 

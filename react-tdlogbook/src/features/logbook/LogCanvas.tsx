@@ -138,12 +138,12 @@ function drawGrid(ctx: CanvasRenderingContext2D): void {
   for (let h = 0; h <= 24; h++) {
     const x = PADDING.left + h * PIXELS_PER_HOUR;
 
-    // Show Midnight/Noon markers and even hours
+    // Show Midnight/Noon markers and all other hours
     let label = "";
     if (h === 0) label = "M";
     else if (h === 12) label = "N";
     else if (h === 24) label = "M";
-    else if (h % 2 === 0) label = h.toString();
+    else label = h.toString();
 
     if (label) {
       ctx.fillText(label, x, PADDING.top + GRID_HEIGHT + 6);
