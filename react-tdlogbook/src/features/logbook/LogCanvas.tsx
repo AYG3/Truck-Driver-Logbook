@@ -183,8 +183,9 @@ function drawSegment(ctx: CanvasRenderingContext2D, segment: DutySegment, canvas
   ctx.lineCap = "square";
 
   ctx.beginPath();
-  ctx.moveTo(xStart, y);
-  ctx.lineTo(xEnd, y);
+  // Offset by 0.5 to align perfectly with pixel grid
+  ctx.moveTo(xStart, y + 0.5);
+  ctx.lineTo(xEnd, y + 0.5);
   ctx.stroke();
 }
 
@@ -207,8 +208,9 @@ function drawTransition(
   ctx.lineCap = "square";
 
   ctx.beginPath();
-  ctx.moveTo(x, y1);
-  ctx.lineTo(x, y2);
+  // Offset by 0.5 to align perfectly with pixel grid
+  ctx.moveTo(x + 0.5, y1);
+  ctx.lineTo(x + 0.5, y2);
   ctx.stroke();
 }
 

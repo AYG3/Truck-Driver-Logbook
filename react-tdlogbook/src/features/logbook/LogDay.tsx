@@ -51,7 +51,7 @@ export function LogDay({ logDay, driverName, truckNumber, carrier }: LogDayProps
       <LogRemarks segments={logDay.segments} />
 
       {/* Totals Section */}
-      <LogTotals totals={logDay.totals} />
+      {/* <LogTotals totals={logDay.totals} /> */}
 
       {/* Violations Warning (if any) */}
       {logDay.violations && logDay.violations.length > 0 && (
