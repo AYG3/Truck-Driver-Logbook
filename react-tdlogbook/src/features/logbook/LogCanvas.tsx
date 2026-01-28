@@ -48,10 +48,25 @@ const STATUS_TO_ROW: Record<DutyStatus, number> = {
 /**
  * Convert ISO time string to X coordinate
  * This is the core mapping - if this is wrong, everything is wrong
+ * 
+ * CRITICAL: Handles midnight crossover correctly
+ * - Times on the canvas date map to hours 0-23.999
+ * - Midnight of the NEXT day (00:00:00 of date+1) maps to hour 24.0
  */
-function timeToX(time: string): number {
+function timeToX(time: string, canvasDate: string): number {
   const date = new Date(time);
+  const canvasDateObj = new Date(canvasDate);
+  
   const hours = date.getHours() + date.getMinutes() / 60 + date.getSeconds() / 3600;
+  
+  // Check if this time is on the next day (midnight crossover)
+  if (date.getDate() !== canvasDateObj.getDate() || 
+      date.getMonth() !== canvasDateObj.getMonth() ||
+      date.getFullYear() !== canvasDateObj.getFullYear()) {
+    // Next day's midnight = hour 24 on this canvas
+    return PADDING.left + 24 * PIXELS_PER_HOUR;
+  }
+  
   return PADDING.left + hours * PIXELS_PER_HOUR;
 }
 
@@ -157,9 +172,9 @@ function drawGrid(ctx: CanvasRenderingContext2D): void {
 /**
  * Draw a single duty segment (horizontal line)
  */
-function drawSegment(ctx: CanvasRenderingContext2D, segment: DutySegment): void {
-  const xStart = timeToX(segment.start);
-  const xEnd = timeToX(segment.end);
+function drawSegment(ctx: CanvasRenderingContext2D, segment: DutySegment, canvasDate: string): void {
+  const xStart = timeToX(segment.start, canvasDate);
+  const xEnd = timeToX(segment.end, canvasDate);
   const y = statusToY(segment.status);
 
   // Draw horizontal line (like paper log)
@@ -179,9 +194,10 @@ function drawSegment(ctx: CanvasRenderingContext2D, segment: DutySegment): void 
 function drawTransition(
   ctx: CanvasRenderingContext2D,
   prevSegment: DutySegment,
-  nextSegment: DutySegment
+  nextSegment: DutySegment,
+  canvasDate: string
 ): void {
-  const x = timeToX(prevSegment.end); // Same as nextSegment.start
+  const x = timeToX(prevSegment.end, canvasDate); // Same as nextSegment.start
   const y1 = statusToY(prevSegment.status);
   const y2 = statusToY(nextSegment.status);
 
@@ -201,16 +217,16 @@ function drawTransition(
  * Backend guarantees: correct order, no overlaps, contiguous segments
  * Frontend just draws.
  */
-function drawAllSegments(ctx: CanvasRenderingContext2D, segments: DutySegment[]): void {
+function drawAllSegments(ctx: CanvasRenderingContext2D, segments: DutySegment[], canvasDate: string): void {
   if (!segments || segments.length === 0) return;
 
   segments.forEach((segment, index) => {
     // Draw the horizontal segment line
-    drawSegment(ctx, segment);
+    drawSegment(ctx, segment, canvasDate);
 
     // Draw vertical transition to next segment (if exists)
     if (index < segments.length - 1) {
-      drawTransition(ctx, segment, segments[index + 1]);
+      drawTransition(ctx, segment, segments[index + 1], canvasDate);
     }
   });
 }
@@ -222,6 +238,16 @@ function drawAllSegments(ctx: CanvasRenderingContext2D, segments: DutySegment[])
 export function LogCanvas({ segments, date, className = "" }: LogCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // Log backend data to console for debugging
+  useEffect(() => {
+    console.log("🎯 LogCanvas received data:", {
+      date,
+      segmentCount: segments.length,
+      segments,
+      timestamp: new Date().toISOString(),
+    });
+  }, [segments, date]);
 
   const draw = useCallback(() => {
     const canvas = canvasRef.current;
@@ -252,8 +278,8 @@ export function LogCanvas({ segments, date, className = "" }: LogCanvasProps) {
 
     // Draw grid first, then segments
     drawGrid(ctx);
-    drawAllSegments(ctx, segments);
-  }, [segments]);
+    drawAllSegments(ctx, segments, date);
+  }, [segments, date]);
 
   useEffect(() => {
     draw();
