@@ -1,7 +1,6 @@
 import { LogHeader } from "./LogHeader";
 import { LogCanvas } from "./LogCanvas";
 import { LogRemarks } from "./LogRemarks";
-import { LogTotals } from "./LogTotals";
 import type { LogDay as LogDayType } from "../../types/log";
 import { LogSummaryTable } from "./LogSummaryTable";
 
@@ -49,9 +48,6 @@ export function LogDay({ logDay, driverName, truckNumber, carrier }: LogDayProps
 
       {/* Remarks Section */}
       <LogRemarks segments={logDay.segments} />
-
-      {/* Totals Section */}
-      {/* <LogTotals totals={logDay.totals} /> */}
 
       {/* Violations Warning (if any) */}
       {logDay.violations && logDay.violations.length > 0 && (
