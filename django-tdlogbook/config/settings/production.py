@@ -26,10 +26,14 @@ DATABASES = {
     )
 }
 
-# Celery - Upstash Redis (broker only, no result backend)
+# Celery Configuration
+# OPTION: For MVP without dedicated worker, use eager mode (tasks run synchronously)
+# For production scale: set CELERY_TASK_ALWAYS_EAGER=False and add Render background worker
+CELERY_TASK_ALWAYS_EAGER = os.environ.get('CELERY_TASK_ALWAYS_EAGER', 'True') == 'True'
+CELERY_TASK_EAGER_PROPAGATES = True  # Propagate exceptions immediately
 CELERY_BROKER_URL = os.environ.get('REDIS_URL', 'redis://localhost:6379/0')
-CELERY_RESULT_BACKEND = None  
-CELERY_TASK_IGNORE_RESULT = True
+CELERY_RESULT_BACKEND = None  # Disabled - no result storage needed
+CELERY_TASK_IGNORE_RESULT = True  # Fire-and-forget pattern
 
 # Static files (handled by WhiteNoise)
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')

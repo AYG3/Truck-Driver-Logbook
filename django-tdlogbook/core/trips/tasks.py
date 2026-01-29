@@ -46,6 +46,7 @@ logger = logging.getLogger("hos")
 
 @shared_task(
     bind=True,
+    ignore_result=True, 
     autoretry_for=(Exception,),
     retry_kwargs={"max_retries": 3, "countdown": 10},
     retry_backoff=True,
@@ -208,8 +209,7 @@ def generate_logs_with_route(self, trip_id: int, route_plan_data: dict):
 
 @shared_task(
     bind=True,
-    autoretry_for=(Exception,),
-    retry_kwargs={"max_retries": 3, "countdown": 10},
+    ignore_result=True,  
     retry_backoff=True,
     retry_backoff_max=300,
 )
