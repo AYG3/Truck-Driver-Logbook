@@ -11,6 +11,7 @@ This is especially useful for:
 """
 
 from django.core.management.base import BaseCommand
+from django.db import connection
 from core.drivers.models import Driver
 
 
@@ -45,6 +46,10 @@ class Command(BaseCommand):
             self.stdout.write(
                 self.style.SUCCESS(f'✓ Created driver: {driver.name} (ID: {driver.id})')
             )
+            # Reset PostgreSQL sequence after manual ID insertion
+            if connection.vendor == 'postgresql':
+                with connection.cursor() as cursor:
+                    cursor.execute("SELECT setval('drivers_id_seq', (SELECT MAX(id) FROM drivers));")
         else:
             self.stdout.write(
                 self.style.SUCCESS(f'✓ Driver already exists: {driver.name} (ID: {driver.id})')
