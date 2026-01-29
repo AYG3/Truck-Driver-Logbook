@@ -9,7 +9,7 @@ from .base import *
 DEBUG = False
 
 # Render provides this automatically
-ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'truck-driver-logbook-w2ht.onrender.com').split(',')
+ALLOWED_HOSTS = ['truck-driver-logbook-w2ht.onrender.com']
 
 
 # Security settings
@@ -43,8 +43,9 @@ SECURE_CONTENT_TYPE_NOSNIFF = True
 X_FRAME_OPTIONS = 'DENY'
 
 # CORS - frontend domain
-CORS_ALLOWED_ORIGINS = os.environ.get(
-    'CORS_ALLOWED_ORIGINS',
-    'https://truck-driver-logbook.vercel.app/',
-    'http://localhost:5173/' #to test from local frontend
-).split(',')
+CORS_ALLOWED_ORIGINS = [
+    'https://truck-driver-logbook.vercel.app',
+    "http://localhost:5173",
+]
+
+print("ALLOWED_HOSTS =", ALLOWED_HOSTS)
