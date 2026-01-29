@@ -9,7 +9,8 @@ from .base import *
 DEBUG = False
 
 # Render provides this automatically
-ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '*').split(',')
+ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'truck-driver-logbook-w2ht.onrender.com').split(',')
+
 
 # Security settings
 SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY')
