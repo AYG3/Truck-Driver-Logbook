@@ -26,9 +26,10 @@ DATABASES = {
     )
 }
 
-# Celery - Upstash's Redis URL
+# Celery - Upstash Redis (broker only, no result backend)
 CELERY_BROKER_URL = os.environ.get('REDIS_URL', 'redis://localhost:6379/0')
-CELERY_RESULT_BACKEND = os.environ.get('REDIS_URL', 'redis://localhost:6379/0')
+CELERY_RESULT_BACKEND = None  
+CELERY_TASK_IGNORE_RESULT = True
 
 # Static files (handled by WhiteNoise)
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')

@@ -23,6 +23,7 @@ import requests
 from datetime import datetime, timedelta
 from typing import Optional, List, Dict, Any
 from dataclasses import dataclass, field
+from urllib.parse import quote
 from django.core.cache import cache
 
 logger = logging.getLogger("hos")
@@ -183,8 +184,8 @@ def reverse_geocode(lat: float, lng: float) -> GeocodingResult:
     Raises:
         GeocodingError: If reverse geocoding fails
     """
-    # Check cache first
-    cache_key = f"reverse_geocode:{lat:.4f},{lng:.4f}"
+    # Check cache first (URL-encode for memcached compatibility)
+    cache_key = f"reverse_geocode:{quote(f'{lat:.4f},{lng:.4f}')}"
     cached = cache.get(cache_key)
     if cached:
         logger.debug(f"Reverse geocode cache hit for: ({lat}, {lng})")
@@ -266,8 +267,8 @@ def geocode_location(location: str) -> GeocodingResult:
     Raises:
         GeocodingError: If geocoding fails or no results found
     """
-    # Check cache first
-    cache_key = f"geocode:{location.lower().strip()}"
+    # Check cache first (URL-encode for memcached compatibility)
+    cache_key = f"geocode:{quote(location.lower().strip())}"
     cached = cache.get(cache_key)
     if cached:
         logger.debug(f"Geocode cache hit for: {location}")
