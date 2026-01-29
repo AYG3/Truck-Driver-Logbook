@@ -97,7 +97,7 @@ export function TripForm({ onSuccess, onFormChange }: TripFormProps) {
   const { mutate: planTrip, isPending } = usePlanTrip();
 
   const [form, setForm] = useState<TripPlanPayload>({
-    driver_id: 1, // Default driver ID (in production, get from auth context)
+    driver_id: 1,
     current_location: "",
     pickup_location: "",
     dropoff_location: "",
