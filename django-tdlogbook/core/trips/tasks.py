@@ -40,6 +40,172 @@ from .models import Trip
 logger = logging.getLogger("hos")
 
 
+# =============================================================================
+# NEW: Route-Aware Log Generation (Steps 5 & 6)
+# =============================================================================
+
+@shared_task(
+    bind=True,
+    autoretry_for=(Exception,),
+    retry_kwargs={"max_retries": 3, "countdown": 10},
+    retry_backoff=True,
+    retry_backoff_max=300,
+)
+def generate_logs_with_route(self, trip_id: int, route_plan_data: dict):
+    """
+    Generate HOS logs for a trip using the new route-aware planner.
+    
+    This is the enhanced version that uses:
+    - OSRM for actual route geometry
+    - Reverse geocoding for stop location names
+    - Full HOS state machine for stop placement
+    - Midnight-split logbook generation
+    
+    Args:
+        trip_id: ID of the Trip to generate logs for
+        route_plan_data: Dictionary containing:
+            - origin: str (starting location)
+            - destination: str (final destination)
+            - pickup_location: str (optional, cargo pickup)
+            - start_time: str (ISO format datetime)
+            - current_cycle_hours: float (default 0)
+            - average_speed_mph: int (default 55)
+            
+    Process:
+        1. Retrieve Trip from database
+        2. Mark as PROCESSING
+        3. Plan route with OSRM
+        4. Generate HOS-compliant stops
+        5. Transform to logbook records
+        6. Persist LogDay and DutySegment atomically
+        7. Update Trip with route data
+        8. Mark as COMPLETED or FAILED
+    """
+    from core.routes.route_planner import plan_trip_with_route
+    from core.routes.services import GeocodingError, RoutingError
+    
+    trip = None
+    
+    try:
+        # Get the trip
+        trip = Trip.objects.select_related('driver').get(id=trip_id)
+        
+        # ====================================================================
+        # STEP 1: Mark as PROCESSING
+        # ====================================================================
+        trip.mark_processing()
+        logger.info(
+            "Starting route-aware log generation for trip %s (driver: %s, %s → %s)",
+            trip_id, trip.driver.name, trip.pickup_location, trip.dropoff_location
+        )
+        
+        # Parse start_time if it's a string
+        start_time = route_plan_data.get('start_time')
+        if isinstance(start_time, str):
+            start_time = datetime.fromisoformat(start_time)
+        
+        # ====================================================================
+        # STEP 2: Plan route and generate logs
+        # ====================================================================
+        logger.info("Planning route for trip %s", trip_id)
+        
+        result = plan_trip_with_route(
+            trip=trip,
+            origin=route_plan_data.get('origin', trip.current_location),
+            destination=route_plan_data.get('destination', trip.dropoff_location),
+            pickup_location=route_plan_data.get('pickup_location', trip.pickup_location),
+            start_time=start_time or trip.planned_start_time,
+            current_cycle_hours=route_plan_data.get('current_cycle_hours', 
+                                                      float(trip.current_cycle_used_hours or 0)),
+            average_speed_mph=route_plan_data.get('average_speed_mph', 
+                                                    trip.average_speed_mph or 55),
+        )
+        
+        logger.info(
+            "Route-aware log generation completed for trip %s: "
+            "%d stops, %d segments, %d log days, %.1f total miles",
+            trip_id,
+            len(result['stops']),
+            len(result['segments']),
+            result['log_days_generated'],
+            result['route'].distance_miles
+        )
+        
+        return {
+            'status': 'success',
+            'trip_id': trip_id,
+            'log_days_generated': result['log_days_generated'],
+            'total_stops': len(result['stops']),
+            'total_trip_hours': result['route'].total_trip_hours,
+            'distance_miles': result['route'].distance_miles,
+        }
+        
+    except Trip.DoesNotExist:
+        logger.error("Trip %s not found", trip_id)
+        return {
+            'status': 'error',
+            'message': f'Trip {trip_id} not found'
+        }
+    
+    except GeocodingError as e:
+        error_msg = f"Geocoding error: {str(e)}"
+        logger.warning("Geocoding failed for trip %s: %s", trip_id, error_msg)
+        
+        if trip:
+            trip.mark_failed(error_msg)
+        
+        return {
+            'status': 'error',
+            'error_type': 'geocoding_error',
+            'message': str(e),
+        }
+    
+    except RoutingError as e:
+        error_msg = f"Routing error: {str(e)}"
+        logger.warning("Routing failed for trip %s: %s", trip_id, error_msg)
+        
+        if trip:
+            trip.mark_failed(error_msg)
+        
+        return {
+            'status': 'error',
+            'error_type': 'routing_error',
+            'message': str(e),
+        }
+    
+    except HOSException as e:
+        error_msg = f"HOS violation: {str(e)}"
+        logger.warning("HOS validation failed for trip %s: %s", trip_id, error_msg)
+        
+        if trip:
+            trip.mark_failed(error_msg)
+        
+        return {
+            'status': 'error',
+            'error_type': 'hos_violation',
+            'message': str(e),
+            'details': getattr(e, 'details', {})
+        }
+    
+    except Exception as exc:
+        error_msg = f"Processing error: {str(exc)}"
+        logger.error(
+            "Error in route-aware log generation for trip %s: %s",
+            trip_id, error_msg,
+            exc_info=True
+        )
+        
+        if trip:
+            trip.mark_failed(error_msg)
+        
+        raise self.retry(exc=exc)
+
+
+# =============================================================================
+# LEGACY: Original HOS Engine Log Generation
+# =============================================================================
+
+
 @shared_task(
     bind=True,
     autoretry_for=(Exception,),

@@ -1,10 +1,10 @@
-# Truck Driver Logbook - Backend
+# Truck Driver Logbook
 
-FMCSA-compliant Hours of Service (HOS) logbook system built with Django.
+FMCSA-compliant Hours of Service (HOS) logbook system with intelligent route planning built with Django REST Framework and React.
 
 ## Overview
 
-This backend generates legal truck driver logs based on FMCSA (Federal Motor Carrier Safety Administration) regulations. It enforces:
+This system generates legal truck driver logs based on FMCSA (Federal Motor Carrier Safety Administration) regulations and provides HOS-compliant route planning with required stops. It enforces:
 
 - 11-hour driving limit (§395.3(a)(1))
 - 14-hour on-duty window (§395.3(a)(2))
@@ -12,56 +12,92 @@ This backend generates legal truck driver logs based on FMCSA (Federal Motor Car
 - 70-hour/8-day cycle limits (§395.3(b))
 - 10-hour rest requirements (§395.3(a)(1))
 
+### Key Features
+
+- **HOS-Compliant Route Planning**: Automatically calculates required rest stops and breaks
+- **Interactive Map Visualization**: View routes with pickup, break, rest, and dropoff stops
+- **Real-time Route Preview**: See your planned route on the map before submitting
+- **Smart Location Input**: Combobox with 40+ common US trucking cities, or type custom locations
+- **Mobile-Responsive UI**: Full mobile support with hamburger menu navigation
+
 ## Architecture
 
 ```
-POST /trips/plan
-     │
-     ▼
-┌──────────────┐    ┌──────────────┐    ┌──────────────┐
-│   Trip       │───▶│   Celery     │───▶│   LogDay     │
-│  (PENDING)   │    │   Worker     │    │  DutySegment │
-└──────────────┘    └──────────────┘    └──────────────┘
-     │                     │
-     ▼                     ▼
-GET /trips/{id}/status    HOS Engine
-     │                     │
-     ▼                     ▼
-{status: "COMPLETED"}     Validation
+┌──────────────────────────────────────────────────────────────┐
+│                      React Frontend                          │
+│  (Vite + React Query + Leaflet Maps + TailwindCSS)          │
+│                                                              │
+│  ┌─────────────┐  ┌─────────────┐  ┌──────────────┐       │
+│  │ Trip Planner│  │  Route Map  │  │   Logbook    │       │
+│  └─────────────┘  └─────────────┘  └──────────────┘       │
+└──────────────────────┬───────────────────────────────────────┘
+                       │ REST API
+                       ▼
+┌──────────────────────────────────────────────────────────────┐
+│                   Django REST Framework                       │
+│                                                              │
+│  POST /api/routes/plan/  →  Route Planning Service          │
+│  POST /api/trips/plan/   →  Trip Creation + HOS Engine      │
+│  GET  /api/trips/{id}/route/ → Route with Stops             │
+│                                                              │
+│  ┌────────────┐    ┌────────────┐    ┌─────────────┐       │
+│  │  OpenRoute │───▶│ HOS Engine │───▶│  LogDay     │       │
+│  │  Service   │    │  + Rules   │    │  Segments   │       │
+│  └────────────┘    └────────────┘    └─────────────┘       │
+└──────────────────────────────────────────────────────────────┘
 ```
 
 ### Key Design Principles
 
-1. **Backend-First Compliance**: Rules are enforced server-side, not client-side
-2. **Deterministic Generation**: Same input always produces same output
-3. **Atomic Persistence**: Logs are saved transactionally (all or nothing)
-4. **Async Processing**: Long-running generation via Celery with status polling
-5. **Three-Layer Validation**: Input → Engine → Database
-
-### Project Structure
-
-```
-django-tdlogbook/
-├── config/              # Django settings and configuration
+1. **Backend-Firs              # Backend (Django REST Framework)
+├── config/                    # Django settings and configuration
 │   ├── settings/
-│   │   ├── base.py     # Shared settings + logging
-│   │   ├── local.py    # Development settings
+│   │   ├── base.py           # Shared settings + logging
+│   │   ├── local.py          # Development settings
 │   │   └── production.py
-│   ├── celery.py       # Celery configuration
 │   └── urls.py
 │
 ├── core/
-│   ├── drivers/        # Driver management
-│   ├── trips/          # Trip planning + status tracking
-│   │   ├── models.py   # Trip with status (PENDING/PROCESSING/COMPLETED/FAILED)
-│   │   ├── tasks.py    # Celery task with lifecycle management
-│   │   ├── services.py # Orchestration layer
-│   │   └── views.py    # REST endpoints + status polling
-│   ├── logs/           # Log storage and retrieval
-│   └── hos/            # HOS engine (pure business logic)
-│       ├── engine.py   # Core log generation algorithm
-│       ├── rules.py    # FMCSA constants (env-configurable)
-│       ├── types.py    # Data structures
+│   ├── drivers/              # Driver management
+│   ├── trips/                # Trip planning + status tracking
+│   │   ├── models.py         # Trip with route data
+│   │   ├── services.py       # Trip orchestration
+│   │   └── views.py          # REST endpoints
+│   ├── logs/                 # Log storage and retrieval
+│   ├── routes/               # 🆕 Route planning service
+│   │   ├── services.py       # OpenRouteService integration
+│   │   ├── logbook_generator.py  # Convert routes to HOS logs
+│   │   ├── route_planner.py  # Stop insertion algorithm
+│   │   └── views.py          # Route planning API
+│   └── hos/                  # HOS engine (pure business logic)
+│       ├── engine.py         # Core log generation algorithm
+│       ├── rules.py          # FMCSA constants
+│       ├── types.py          # Data structures
+│       ├── validators.py     # Input validation
+│       ├── event_validators.py  # Output validation
+│       └── exceptions.py     # Domain exceptions
+│
+├── tests/
+│   └── test_hos_rules.py     # HOS compliance tests
+│
+├── manage.py
+└── requirements.txt
+
+react-tdlogbook/              # 🆕 Frontend (React + Vite)
+├── src/
+│   ├── api/                  # API client (axios)
+│   ├── components/
+│   │   ├── layout/          # Header, Layout (mobile-responsive)
+│   │   └── ui/              # Button, Card, Input, Select, Combobox
+│   ├── features/
+│   │   ├── dashboard/
+│   │   ├── logbook/
+│   │   ├── map/             # 🆕 RouteMap with Leaflet
+│   │   └── trip-planner/    # 🆕 TripForm, TripStatus
+│   ├── hooks/               # React Query hooks
+│   └── types/               # TypeScript types
+├── package.json
+└── vite.config.ts    # Data structures
 │       ├── validators.py  # Input validation
 │       ├── event_validators.py  # Output validation
 │       └── exceptions.py  # Domain exceptions
@@ -76,74 +112,109 @@ django-tdlogbook/
 
 ## Assessment Assumptions
 
-This implementation explicitly assumes:
+ThNode.js 18+ and npm
+- SQLite (default) or PostgreSQL
 
-| Assumption | Value | Reference |
-|------------|-------|-----------|
-| Driver Type | Property-carrying | FMCSA Part 395 |
-| Cycle Type | 70 hours / 8 days | §395.3(b) |
-| Driving Conditions | Normal (no adverse) | §395.1(b)(1) |
-| Pickup Duration | 1 hour | Fixed assumption |
-| Dropoff Duration | 1 hour | Fixed assumption |
-| Fuel Stop Interval | Every 1,000 miles | Fixed assumption |
+### Backend Setup
 
-These are configurable via environment variables (see `.env.example`).
-
-## Setup
-
-### Prerequisites
-
-- Python 3.10+
-- PostgreSQL
-- Redis (for Celery)
-
-### Installation
-
-1. Create virtual environment:
+1. Navigate to backend directory:
 ```bash
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+cd django-tdlogbook
 ```
 
-2. Install dependencies:
+2. Create virtual environment:
+```bash
+python -m venv logbook-venv
+source logbook-venv/bin/activate  # On Windows: logbook-venv\Scripts\activate
+```
+
+3. Install dependencies:
 ```bash
 pip install -r requirements.txt
 ```
 
-3. Set up PostgreSQL database:
-```bash
-createdb tdlogbook
-```
-
 4. Run migrations:
 ```bash
-python manage.py makemigrations
 python manage.py migrate
 ```
 
-5. Create superuser (optional):
+5. Create a test driver:
 ```bash
-python manage.py createsuperuser
+python manage.py shell -c "
+from core.drivers.models import Driver
+Driver.objects.get_or_create(name='John Doe', defaults={'cycle_type': '70_8'})
+print('✓ Test driver created')
+"
 ```
 
-### Running the Application
-
-1. Start Django server:
+6. Start Django server:
 ```bash
 python manage.py runserver
 ```
 
-2. Start Celery worker (in another terminal):
+Backend will run on `http://localhost:8000`
+
+### Frontend Setup
+
+1. Navigate to frontend directory (in a new terminal):
 ```bash
-celery -A config worker --loglevel=info
+cd react-tdlogbook
 ```
 
-3. Start Redis (if not running):
+2. Install dependencies:
 ```bash
-redis-server
+npm install
 ```
 
-## API Endpoints
+3. Start dev server:
+```bash
+npm run dev
+```
+
+Frontend will run on `http://localhost:5173` (or 5174 if 5173 is taken)
+
+### Quick Start
+
+1. Open `http://localhost:5173` in your browser
+2. Navigate to **Trip Planner**
+3. Fill in the form:
+   - Current Location: Type or select a city (e.g., "Dallas, TX")
+   - Pickup Location: Type or select (e.g., "Dallas, TX" or "Same as current")
+   - Dropoff Location: Type or select (e.g., "Atlanta, GA")
+   -Route Planning (New!)
+
+- `POST /api/routes/plan/` - Calculate HOS-compliant route with stops
+
+Example request:
+```json
+{
+  "origin": "Dallas, TX",
+  "destination": "Atlanta, GA",
+  "current_cycle_hours": 0,
+  "average_speed_mph": 55
+}
+```
+
+Example response:
+```json
+{
+  "success": true,
+  "distance_miles": 782.7,
+  "duration_hours": 14.23,
+  "stops": [
+    {"type": "PICKUP", "location": "Dallas, TX", "reason": "Load pickup"},
+    {"type": "BREAK", "location": "Texarkana, TX", "reason": "30-min break after 8h driving"},
+    {"type": "REST", "location": "Monroe, LA", "reason": "10-hour rest (14h window)"},
+    {"type": "DROPOFF", "location": "Atlanta, GA", "reason": "Delivery dropoff"}
+  ],
+  "geometry": [[lat, lng], [lat, lng], ...],  // 8000+ points for map
+  "route_data": {
+    "total_driving_hours": 14.23,
+    "breaks_count": 1,
+    "rest_count": 1
+  }
+}
+```
 
 ### Drivers
 
@@ -151,6 +222,27 @@ redis-server
 - `POST /api/drivers/` - Create a driver
 - `GET /api/drivers/{id}/` - Get driver details
 
+### Trip Planning
+
+- `POST /api/trips/plan/` - Plan a trip and generate logs
+- `GET /api/trips/{id}/` - Get trip details
+- `GET /api/trips/{id}/route/` - Get trip route with geometry and stops
+
+Example request:
+```json
+{
+  "driver_id": 1,
+  "current_location": "Dallas, TX",
+  "pickup_location": "Dallas, TX",
+  "dropoff_location": "Atlanta, GA",
+  "planned_start_time": "2026-01-29T06:00:00Z",
+  "current_cycle_used_hours": 0,
+  "total_miles": 782,
+  "average_speed_mph": 55
+}
+```
+
+Response includes `trip_id`, `status`, and route data with stops.
 ### Trip Planning
 
 - `POST /api/trips/plan/` - Plan a trip and generate logs
@@ -249,15 +341,56 @@ The HOS engine (`core/hos/engine.py`) implements the following algorithm:
 2. **Driving Phase**: 
    - Drive in blocks (max 2 hours continuous)
    - Add fuel stops every 1000 miles
-   - Add 30-minute break after 8 hours driving
-   - Enforce 11-hour driving limit
-   - Enforce 14-hour on-duty window
-   - Force 10-hour rest when limits are hit
-3. **Dropoff Phase**: 1-hour ON_DUTY for unloading
-4. **Split by Calendar Day**: Logs are split at midnight
-5. **Fill Gaps**: Any unaccounted time is marked OFF_DUTY
+   Technology Stack
 
-## Database Schema
+### Backend
+- Django 4.2 + Django REST Framework
+- OpenRouteService API (route planning)
+- SQLite (default) / PostgreSQL
+- Python 3.13
+
+### Frontend
+- React 18 with TypeScript
+- Vite (build tool)
+- React Query (data fetching)
+- Leaflet + react-leaflet (maps)
+- TailwindCSS (styling)
+- Heroicons (icons)
+
+## Route Planning Features
+
+The route planning system calculates HOS-compliant routes by:
+
+1. **Fetching Real Routes**: Uses OpenRouteService to get actual driving routes with distance and geometry
+2. **Calculating Drive Time**: Based on distance and average speed
+3. **Inserting Required Stops**:
+   - **30-minute break** after 8 hours of driving (§395.3(a)(3)(ii))
+   - **10-hour rest** when 11-hour drive limit or 14-hour window is reached
+   - **Fuel stops** every 1000 miles (configurable)
+4. **Map Visualization**: Displays route polyline with color-coded stop markers
+
+### Stop Types
+
+| Type | Icon Color | Purpose |
+|------|-----------|---------|
+| PICKUP | 🟢 Green | Load pickup location |
+| BREAK | 🟡 Yellow | 30-minute rest break |
+| REST | 🟣 Purple | 10-hour sleeper berth rest |
+| DROPOFF | 🔴 Red | Delivery dropoff location |
+
+## Future Enhancements
+
+- [x] Real route planning with APIs ✅
+- [x] Interactive map visualization ✅
+- [x] Mobile-responsive design ✅
+- [ ] Authentication and authorization
+- [ ] 60-hour/7-day cycle support
+- [ ] Split sleeper berth provisions
+- [ ] ELD (Electronic Logging Device) integration
+- [ ] Violation detection and warnings
+- [ ] Export to PDF (official log format)
+- [ ] Multi-day trip planning
+- [ ] Driver dashboard with current HOS status
 
 ```
 Driver (1) → (N) Trip (1) → (N) LogDay (1) → (N) DutySegment

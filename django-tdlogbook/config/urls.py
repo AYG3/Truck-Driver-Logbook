@@ -10,4 +10,5 @@ urlpatterns = [
     path('api/drivers/', include('core.drivers.urls')),
     path('api/trips/', include('core.trips.urls')),
     path('api/logs/', include('core.logs.urls')),
+    path('api/routes/', include('core.routes.urls')),
 ]

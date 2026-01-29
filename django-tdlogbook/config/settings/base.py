@@ -38,6 +38,7 @@ INSTALLED_APPS = [
     'core.drivers',
     'core.trips',
     'core.logs',
+    'core.routes',
 ]
 
 MIDDLEWARE = [

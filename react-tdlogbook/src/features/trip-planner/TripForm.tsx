@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   MapPinIcon,
   TruckIcon,
@@ -7,13 +7,66 @@ import {
   ArrowTrendingUpIcon,
 } from "@heroicons/react/24/outline";
 import { toast } from "sonner";
-import { Card, Button, Input } from "../../components/ui";
+import { Card, Button, Input, Combobox } from "../../components/ui";
 import { usePlanTrip } from "../../hooks/useTrips";
 import { getErrorMessage } from "../../api/client";
 import type { TripPlanPayload } from "../../types/trip";
 
+// Common US cities for trucking routes
+const COMMON_LOCATIONS = [
+  { value: "", label: "Select a location..." },
+  // Northeast
+  { value: "New York, NY", label: "New York, NY" },
+  { value: "Philadelphia, PA", label: "Philadelphia, PA" },
+  { value: "Newark, NJ", label: "Newark, NJ" },
+  { value: "Baltimore, MD", label: "Baltimore, MD" },
+  { value: "Boston, MA", label: "Boston, MA" },
+  { value: "Pittsburgh, PA", label: "Pittsburgh, PA" },
+  { value: "Buffalo, NY", label: "Buffalo, NY" },
+  // Southeast
+  { value: "Atlanta, GA", label: "Atlanta, GA" },
+  { value: "Charlotte, NC", label: "Charlotte, NC" },
+  { value: "Richmond, VA", label: "Richmond, VA" },
+  { value: "Nashville, TN", label: "Nashville, TN" },
+  { value: "Memphis, TN", label: "Memphis, TN" },
+  { value: "Jacksonville, FL", label: "Jacksonville, FL" },
+  { value: "Miami, FL", label: "Miami, FL" },
+  { value: "Tampa, FL", label: "Tampa, FL" },
+  { value: "New Orleans, LA", label: "New Orleans, LA" },
+  // Midwest
+  { value: "Chicago, IL", label: "Chicago, IL" },
+  { value: "Indianapolis, IN", label: "Indianapolis, IN" },
+  { value: "Columbus, OH", label: "Columbus, OH" },
+  { value: "Cleveland, OH", label: "Cleveland, OH" },
+  { value: "Detroit, MI", label: "Detroit, MI" },
+  { value: "Milwaukee, WI", label: "Milwaukee, WI" },
+  { value: "Minneapolis, MN", label: "Minneapolis, MN" },
+  { value: "Kansas City, MO", label: "Kansas City, MO" },
+  { value: "St. Louis, MO", label: "St. Louis, MO" },
+  { value: "Omaha, NE", label: "Omaha, NE" },
+  // Southwest
+  { value: "Dallas, TX", label: "Dallas, TX" },
+  { value: "Houston, TX", label: "Houston, TX" },
+  { value: "San Antonio, TX", label: "San Antonio, TX" },
+  { value: "Austin, TX", label: "Austin, TX" },
+  { value: "El Paso, TX", label: "El Paso, TX" },
+  { value: "Phoenix, AZ", label: "Phoenix, AZ" },
+  { value: "Albuquerque, NM", label: "Albuquerque, NM" },
+  { value: "Denver, CO", label: "Denver, CO" },
+  { value: "Salt Lake City, UT", label: "Salt Lake City, UT" },
+  { value: "Las Vegas, NV", label: "Las Vegas, NV" },
+  // West Coast
+  { value: "Los Angeles, CA", label: "Los Angeles, CA" },
+  { value: "San Francisco, CA", label: "San Francisco, CA" },
+  { value: "San Diego, CA", label: "San Diego, CA" },
+  { value: "Oakland, CA", label: "Oakland, CA" },
+  { value: "Seattle, WA", label: "Seattle, WA" },
+  { value: "Portland, OR", label: "Portland, OR" },
+];
+
 interface TripFormProps {
   onSuccess: (tripId: number) => void;
+  onFormChange?: (form: TripPlanPayload) => void;
 }
 
 // Helper to get default start time (next hour)
@@ -23,7 +76,24 @@ function getDefaultStartTime(): string {
   return now.toISOString().slice(0, 16); // Format: YYYY-MM-DDTHH:mm
 }
 
-export function TripForm({ onSuccess }: TripFormProps) {
+// Debounce hook
+function useDebounce<T>(value: T, delay: number): T {
+  const [debouncedValue, setDebouncedValue] = useState<T>(value);
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedValue(value);
+    }, delay);
+
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [value, delay]);
+
+  return debouncedValue;
+}
+
+export function TripForm({ onSuccess, onFormChange }: TripFormProps) {
   const { mutate: planTrip, isPending } = usePlanTrip();
 
   const [form, setForm] = useState<TripPlanPayload>({
@@ -37,7 +107,16 @@ export function TripForm({ onSuccess }: TripFormProps) {
     average_speed_mph: 55,
   });
 
-  console.log("TripForm render with form:", form);
+  // Debounce form changes for route preview (1 second delay)
+  const debouncedForm = useDebounce(form, 1000);
+  
+  // Notify parent of form changes for route preview
+  useEffect(() => {
+    if (onFormChange && debouncedForm.current_location && debouncedForm.dropoff_location) {
+      onFormChange(debouncedForm);
+    }
+  }, [debouncedForm, onFormChange]);
+
   const [validationErrors, setValidationErrors] = useState<
     Partial<Record<keyof TripPlanPayload, string>>
   >({});
@@ -130,6 +209,17 @@ export function TripForm({ onSuccess }: TripFormProps) {
       }
     };
 
+  const handleSelectChange =
+    (field: keyof TripPlanPayload) =>
+    (value: string) => {
+      setForm((prev) => ({ ...prev, [field]: value }));
+
+      // Clear validation error when user selects
+      if (validationErrors[field]) {
+        setValidationErrors((prev) => ({ ...prev, [field]: undefined }));
+      }
+    };
+
   // Calculate estimated driving time
   const estimatedDrivingHours =
     form.total_miles > 0 && form.average_speed_mph > 0
@@ -147,45 +237,54 @@ export function TripForm({ onSuccess }: TripFormProps) {
 
           {/* Current Location */}
           <div className="relative">
-            <div className="absolute left-3 top-9 text-gray-400">
+            <div className="absolute left-3 top-9 text-gray-400 z-10 pointer-events-none">
               <TruckIcon className="h-5 w-5" />
             </div>
-            <Input
+            <Combobox
               label="Current Location"
-              placeholder="e.g., Chicago, IL"
+              options={COMMON_LOCATIONS}
               value={form.current_location}
-              onChange={handleInputChange("current_location")}
+              onChange={handleSelectChange("current_location")}
               error={validationErrors.current_location}
+              placeholder="e.g New York, NY"
               className="pl-10"
             />
           </div>
 
           {/* Pickup Location */}
           <div className="relative">
-            <div className="absolute left-3 top-9 text-green-500">
+            <div className="absolute left-3 top-9 text-green-500 z-10 pointer-events-none">
               <MapPinIcon className="h-5 w-5" />
             </div>
-            <Input
+            <Combobox
               label="Pickup Location"
-              placeholder="e.g., Indianapolis, IN"
+              options={[
+                { value: "", label: "Select a location..." },
+                ...(form.current_location 
+                  ? [{ value: form.current_location, label: `Same as current (${form.current_location})` }]
+                  : []),
+                ...COMMON_LOCATIONS.slice(1), // Skip the "Select a location..." option
+              ]}
               value={form.pickup_location}
-              onChange={handleInputChange("pickup_location")}
+              onChange={handleSelectChange("pickup_location")}
               error={validationErrors.pickup_location}
+              placeholder="e.g Dallas, TX"
               className="pl-10"
             />
           </div>
 
           {/* Drop-off Location */}
           <div className="relative">
-            <div className="absolute left-3 top-9 text-red-500">
+            <div className="absolute left-3 top-9 text-red-500 z-10 pointer-events-none">
               <MapPinIcon className="h-5 w-5" />
             </div>
-            <Input
+            <Combobox
               label="Drop-off Location"
-              placeholder="e.g., Columbus, OH"
+              options={COMMON_LOCATIONS}
               value={form.dropoff_location}
-              onChange={handleInputChange("dropoff_location")}
+              onChange={handleSelectChange("dropoff_location")}
               error={validationErrors.dropoff_location}
+              placeholder="e.g Philadelphia, PA"
               className="pl-10"
             />
           </div>
