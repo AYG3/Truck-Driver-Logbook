@@ -115,7 +115,8 @@ export function TripForm({ onSuccess, onFormChange }: TripFormProps) {
     if (onFormChange && debouncedForm.current_location && debouncedForm.dropoff_location) {
       onFormChange(debouncedForm);
     }
-  }, [debouncedForm, onFormChange]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debouncedForm]);
 
   const [validationErrors, setValidationErrors] = useState<
     Partial<Record<keyof TripPlanPayload, string>>
