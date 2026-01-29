@@ -12,7 +12,7 @@ export default defineConfig({
     proxy: {
       '/api': {
         // Development: point to local backend
-        target: 'http://localhost:8000',
+        target: 'https://truck-driver-logbook-w2ht.onrender.com',
         changeOrigin: true,
       },
     },
@@ -22,7 +22,7 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     sourcemap: false,
-    minify: 'terser',
+    minify: 'esbuild',
     chunkSizeWarningLimit: 1000,
   },
   

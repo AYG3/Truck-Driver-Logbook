@@ -45,5 +45,6 @@ X_FRAME_OPTIONS = 'DENY'
 # CORS - frontend domain
 CORS_ALLOWED_ORIGINS = os.environ.get(
     'CORS_ALLOWED_ORIGINS',
-    'https://truck-driver-logbook.vercel.app/'
+    'https://truck-driver-logbook.vercel.app/',
+    'http://localhost:5173/' #to test from local frontend
 ).split(',')
