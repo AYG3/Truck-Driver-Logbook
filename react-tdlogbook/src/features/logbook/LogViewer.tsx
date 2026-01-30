@@ -2,7 +2,6 @@ import { useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import {
   ArrowLeftIcon,
-  DocumentArrowDownIcon,
   CalendarIcon,
   PrinterIcon,
 } from "@heroicons/react/24/outline";

@@ -186,7 +186,7 @@ export function TripForm({ onSuccess, onFormChange }: TripFormProps) {
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const value =
         field === "current_cycle_used_hours"
-          ? parseFloat(e.target.value) || 0
+          ? isNaN(e.target.valueAsNumber) ? "" : e.target.valueAsNumber
           : e.target.value;
 
       setForm((prev) => ({ ...prev, [field]: value }));
@@ -313,7 +313,7 @@ export function TripForm({ onSuccess, onFormChange }: TripFormProps) {
               max="70"
               step="0.5"
               placeholder="0"
-              value={form.current_cycle_used_hours || ""}
+              value={form.current_cycle_used_hours ?? ""}
               onChange={handleInputChange("current_cycle_used_hours")}
               error={validationErrors.current_cycle_used_hours}
               helperText="Hours used in current 70-hour/8-day cycle"
