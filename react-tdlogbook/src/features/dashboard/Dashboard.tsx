@@ -1,13 +1,32 @@
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import {
   TruckIcon,
   ArrowRightIcon,
+  TrashIcon,
+  ExclamationTriangleIcon,
 } from "@heroicons/react/24/outline";
 import { Card, Button, LoadingSpinner } from "../../components/ui";
-import { useTrips } from "../../hooks/useTrips";
+import { useTrips, useDeleteAllTrips } from "../../hooks/useTrips";
 
 export function Dashboard() {
   const { data: trips, isLoading: tripsLoading } = useTrips();
+  const { mutate: deleteAll, isPending: isDeleting } = useDeleteAllTrips();
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+
+  const handleClearAllTrips = () => {
+    deleteAll(undefined, {
+      onSuccess: (data) => {
+        setShowConfirmDialog(false);
+        // Show success message
+        alert(`Successfully deleted ${data.deleted_count} trip(s)`);
+      },
+      onError: (error) => {
+        setShowConfirmDialog(false);
+        alert(`Failed to delete trips: ${error.message}`);
+      },
+    });
+  };
 
   return (
     <div className="space-y-8">
@@ -19,11 +38,23 @@ export function Dashboard() {
             Welcome back! Here's your driving status overview.
           </p>
         </div>
-        <Link to="/trips">
-          <Button rightIcon={<ArrowRightIcon className="h-4 w-4" />}>
-            Plan New Trip
-          </Button>
-        </Link>
+        <div className="flex gap-3">
+          {trips && trips.results.length > 0 && (
+            <Button
+              variant="secondary"
+              onClick={() => setShowConfirmDialog(true)}
+              leftIcon={<TrashIcon className="h-4 w-4" />}
+              disabled={isDeleting}
+            >
+              Clear All Trips
+            </Button>
+          )}
+          <Link to="/trips">
+            <Button rightIcon={<ArrowRightIcon className="h-4 w-4" />}>
+              Plan New Trip
+            </Button>
+          </Link>
+        </div>
       </div>
 
       {/* Recent Trips */}
@@ -84,6 +115,46 @@ export function Dashboard() {
           </div>
         )}
       </Card>
+
+      {/* Confirmation Dialog */}
+      {showConfirmDialog && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+            <div className="flex items-start gap-4">
+              <div className="shrink-0">
+                <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center">
+                  <ExclamationTriangleIcon className="h-6 w-6 text-red-600" />
+                </div>
+              </div>
+              <div className="flex-1">
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                  Clear All Trips?
+                </h3>
+                <p className="text-sm text-gray-600 mb-4">
+                  This will permanently delete all trips and their associated logs. 
+                  This action cannot be undone.
+                </p>
+                <div className="flex gap-3 justify-end">
+                  <Button
+                    variant="secondary"
+                    onClick={() => setShowConfirmDialog(false)}
+                    disabled={isDeleting}
+                  >
+                    Cancel
+                  </Button>
+                  <button
+                    onClick={handleClearAllTrips}
+                    disabled={isDeleting}
+                    className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
+                  >
+                    {isDeleting ? "Deleting..." : "Delete All"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -61,3 +61,12 @@ export async function getTrips(page: number = 1): Promise<TripListResponse> {
 export async function cancelTrip(tripId: number): Promise<void> {
   await apiClient.post(`/trips/${tripId}/cancel/`);
 }
+
+/**
+ * Delete all trips
+ * @returns Response with deletion count
+ */
+export async function deleteAllTrips(): Promise<{ status: string; message: string; deleted_count: number }> {
+  const { data } = await apiClient.delete<{ status: string; message: string; deleted_count: number }>("/trips/clear-all/");
+  return data;
+}

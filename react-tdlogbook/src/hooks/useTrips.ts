@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { planTrip, getTripStatus, getTrips, getTrip, cancelTrip } from "../api/trips";
+import { planTrip, getTripStatus, getTrips, getTrip, cancelTrip, deleteAllTrips } from "../api/trips";
 import type { TripPlanPayload, TripStatus } from "../types/trip";
 import { POLLING_INTERVALS } from "../utils/constants";
 
@@ -85,6 +85,21 @@ export function useCancelTrip() {
       // Invalidate both the trip detail and list
       queryClient.invalidateQueries({ queryKey: tripKeys.detail(tripId) });
       queryClient.invalidateQueries({ queryKey: tripKeys.lists() });
+    },
+  });
+}
+
+/**
+ * Hook to delete all trips
+ */
+export function useDeleteAllTrips() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: () => deleteAllTrips(),
+    onSuccess: () => {
+      // Invalidate all trip-related queries
+      queryClient.invalidateQueries({ queryKey: tripKeys.all });
     },
   });
 }
