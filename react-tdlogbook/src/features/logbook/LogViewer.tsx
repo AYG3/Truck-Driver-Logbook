@@ -104,13 +104,13 @@ export function LogViewer() {
           >
             Print
           </Button>
-          <Button
+          {/* <Button
             variant="secondary"
             size="sm"
             leftIcon={<DocumentArrowDownIcon className="h-4 w-4" />}
           >
             Export PDF
-          </Button>
+          </Button> */}
         </div>
       </div>
 
