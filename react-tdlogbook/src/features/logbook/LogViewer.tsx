@@ -7,6 +7,7 @@ import {
   PrinterIcon,
 } from "@heroicons/react/24/outline";
 import { LogDay } from "./LogDay";
+import { TripList } from "./TripList";
 import {
   Button,
   LoadingSpinner,
@@ -36,20 +37,9 @@ export function LogViewer() {
   // Fetch logs - enabled when tripId exists and trip is COMPLETED
   const { data: logs, isLoading, error } = useTripLogs(parsedTripId, "COMPLETED");
 
-  // No trip selected state
+  // No trip selected state - show list of completed trips
   if (!parsedTripId) {
-    return (
-      <EmptyState
-        title="No Trip Selected"
-        description="Select a trip to view its logs or plan a new trip first."
-        icon={CalendarIcon}
-        action={
-          <Link to="/trips">
-            <Button>Plan a Trip</Button>
-          </Link>
-        }
-      />
-    );
+    return <TripList />;
   }
 
   // Loading state
