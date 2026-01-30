@@ -4,7 +4,6 @@ import {
   TruckIcon,
   ClockIcon,
   CalendarIcon,
-  ArrowTrendingUpIcon,
 } from "@heroicons/react/24/outline";
 import { toast } from "sonner";
 import { Card, Button, Input, Combobox } from "../../components/ui";
@@ -69,11 +68,12 @@ interface TripFormProps {
   onFormChange?: (form: TripPlanPayload) => void;
 }
 
-// Helper to get default start time (next hour)
+// Helper to get default start time (midnight tomorrow)
 function getDefaultStartTime(): string {
-  const now = new Date();
-  now.setHours(now.getHours() + 1, 0, 0, 0);
-  return now.toISOString().slice(0, 16); // Format: YYYY-MM-DDTHH:mm
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  tomorrow.setHours(0, 0, 0, 0);
+  return tomorrow.toISOString().slice(0, 16); // Format: YYYY-MM-DDTHH:mm
 }
 
 // Debounce hook
@@ -103,8 +103,6 @@ export function TripForm({ onSuccess, onFormChange }: TripFormProps) {
     dropoff_location: "",
     planned_start_time: getDefaultStartTime(),
     current_cycle_used_hours: 0,
-    total_miles: 0,
-    average_speed_mph: 55,
   });
 
   // Debounce form changes for route preview (1 second delay)
@@ -135,17 +133,9 @@ export function TripForm({ onSuccess, onFormChange }: TripFormProps) {
     if (!form.dropoff_location.trim()) {
       errors.dropoff_location = "Drop-off location is required";
     }
-    if (!form.planned_start_time) {
-      errors.planned_start_time = "Planned start time is required";
-    }
+    // planned_start_time is optional - will default to midnight on backend
     if (form.current_cycle_used_hours < 0 || form.current_cycle_used_hours > 70) {
       errors.current_cycle_used_hours = "Must be between 0 and 70 hours";
-    }
-    if (form.total_miles <= 0) {
-      errors.total_miles = "Total miles must be greater than 0";
-    }
-    if (form.average_speed_mph <= 0 || form.average_speed_mph > 80) {
-      errors.average_speed_mph = "Speed must be between 1 and 80 mph";
     }
 
     setValidationErrors(errors);
@@ -154,14 +144,11 @@ export function TripForm({ onSuccess, onFormChange }: TripFormProps) {
 
   // Check if form is valid for enabling submit button
   const isValid =
-    form.total_miles > 0 &&
-    form.average_speed_mph > 0 &&
     form.current_cycle_used_hours >= 0 &&
     form.current_cycle_used_hours <= 70 &&
     form.current_location.trim() !== "" &&
     form.pickup_location.trim() !== "" &&
-    form.dropoff_location.trim() !== "" &&
-    form.planned_start_time !== "";
+    form.dropoff_location.trim() !== "";
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -171,10 +158,12 @@ export function TripForm({ onSuccess, onFormChange }: TripFormProps) {
       return;
     }
 
-    // Convert local datetime to ISO string for backend
+    // Convert local datetime to ISO string for backend (if provided)
     const payload: TripPlanPayload = {
       ...form,
-      planned_start_time: new Date(form.planned_start_time).toISOString(),
+      planned_start_time: form.planned_start_time 
+        ? new Date(form.planned_start_time).toISOString() 
+        : undefined,
     };
 
     planTrip(payload, {
@@ -196,9 +185,7 @@ export function TripForm({ onSuccess, onFormChange }: TripFormProps) {
     (field: keyof TripPlanPayload) =>
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const value =
-        field === "current_cycle_used_hours" ||
-        field === "total_miles" ||
-        field === "average_speed_mph"
+        field === "current_cycle_used_hours"
           ? parseFloat(e.target.value) || 0
           : e.target.value;
 
@@ -220,12 +207,6 @@ export function TripForm({ onSuccess, onFormChange }: TripFormProps) {
         setValidationErrors((prev) => ({ ...prev, [field]: undefined }));
       }
     };
-
-  // Calculate estimated driving time
-  const estimatedDrivingHours =
-    form.total_miles > 0 && form.average_speed_mph > 0
-      ? (form.total_miles / form.average_speed_mph).toFixed(1)
-      : "0";
 
   return (
     <Card>
@@ -303,57 +284,15 @@ export function TripForm({ onSuccess, onFormChange }: TripFormProps) {
               <CalendarIcon className="h-5 w-5" />
             </div>
             <Input
-              label="Planned Start Time"
+              label="Planned Start Time (optional)"
               type="datetime-local"
-              value={form.planned_start_time}
+              value={form.planned_start_time || ""}
               onChange={handleInputChange("planned_start_time")}
               error={validationErrors.planned_start_time}
+              helperText="Defaults to midnight if not specified"
               className="pl-10"
             />
           </div>
-
-          {/* Total Miles and Average Speed (side by side) */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="relative">
-              <div className="absolute left-3 top-9 text-gray-400">
-                <ArrowTrendingUpIcon className="h-5 w-5" />
-              </div>
-              <Input
-                label="Total Miles"
-                type="number"
-                min="1"
-                step="1"
-                placeholder="e.g., 500"
-                value={form.total_miles || ""}
-                onChange={handleInputChange("total_miles")}
-                error={validationErrors.total_miles}
-                className="pl-10"
-              />
-            </div>
-
-            <Input
-              label="Average Speed (mph)"
-              type="number"
-              min="1"
-              max="80"
-              step="1"
-              placeholder="55"
-              value={form.average_speed_mph || ""}
-              onChange={handleInputChange("average_speed_mph")}
-              error={validationErrors.average_speed_mph}
-              helperText="Typical: 55-65 mph"
-            />
-          </div>
-
-          {/* Estimated Driving Time Display */}
-          {form.total_miles > 0 && form.average_speed_mph > 0 && (
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-              <p className="text-sm text-blue-800">
-                <span className="font-medium">Estimated Driving Time:</span>{" "}
-                {estimatedDrivingHours} hours
-              </p>
-            </div>
-          )}
         </div>
 
         {/* HOS Section */}
@@ -392,6 +331,7 @@ export function TripForm({ onSuccess, onFormChange }: TripFormProps) {
             <li>• 11-hour driving limit per shift</li>
             <li>• 14-hour on-duty window</li>
             <li>• 30-minute break required after 8 hours driving</li>
+            <li>• 30-minute fuel stop every 1,000 miles</li>
             <li>• 10-hour consecutive rest required</li>
             <li>• 70-hour/8-day cycle limit</li>
           </ul>

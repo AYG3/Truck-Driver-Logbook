@@ -27,12 +27,13 @@ def validate_trip_input(input_data: TripPlanInput) -> None:
     if input_data.current_cycle_used_hours > 70:
         raise ValidationError("current_cycle_used_hours cannot exceed 70")
     
-    # Validate distance
-    if input_data.total_miles <= 0:
-        raise ValidationError("total_miles must be positive")
-    
-    if input_data.total_miles > 5000:
-        raise ValidationError("total_miles seems unrealistic (max 5000 miles)")
+    # Validate distance (only if provided - route planner calculates it)
+    if input_data.total_miles is not None:
+        if input_data.total_miles <= 0:
+            raise ValidationError("total_miles must be positive")
+        
+        if input_data.total_miles > 5000:
+            raise ValidationError("total_miles seems unrealistic (max 5000 miles)")
     
     # Validate speed
     if input_data.average_speed_mph <= 0:
@@ -41,11 +42,12 @@ def validate_trip_input(input_data: TripPlanInput) -> None:
     if input_data.average_speed_mph > 80:
         raise ValidationError("average_speed_mph cannot exceed 80 mph")
     
-    # Validate timing
-    now = datetime.now(timezone.utc)
-    if input_data.planned_start_time < now:
-        # Warning: allowing past dates for testing/demos
-        pass
+    # Validate timing (only if provided - defaults to midnight)
+    if input_data.planned_start_time is not None:
+        now = datetime.now(timezone.utc)
+        if input_data.planned_start_time < now:
+            # Warning: allowing past dates for testing/demos
+            pass
     
     # Validate locations
     if not input_data.current_location or not input_data.current_location.strip():

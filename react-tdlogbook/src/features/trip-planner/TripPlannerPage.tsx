@@ -32,14 +32,13 @@ export function TripPlannerPage() {
   // Handle form field changes to update route preview
   const handleFormChange = (form: TripPlanPayload) => {
     // Only fetch route preview when we have origin and destination
-    if (form.current_location && form.dropoff_location && form.total_miles > 0) {
+    if (form.current_location && form.dropoff_location) {
       fetchRoute(
         {
           origin: form.current_location,
           destination: form.dropoff_location,
           pickup_location: form.pickup_location || undefined,
           current_cycle_hours: form.current_cycle_used_hours,
-          average_speed_mph: form.average_speed_mph,
         },
         {
           onSuccess: (response) => {

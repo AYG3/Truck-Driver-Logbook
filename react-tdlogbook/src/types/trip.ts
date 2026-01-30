@@ -8,10 +8,8 @@ export interface TripPlanPayload {
   current_location: string;
   pickup_location: string;
   dropoff_location: string;
-  planned_start_time: string; // ISO datetime string
+  planned_start_time?: string; // ISO datetime string (optional, defaults to midnight)
   current_cycle_used_hours: number; // Hours already used in current 70-hour cycle
-  total_miles: number;
-  average_speed_mph: number;
 }
 
 export interface TripPlanResponse {

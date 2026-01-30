@@ -34,19 +34,19 @@ class TripPlanInput:
     current_location: str
     pickup_location: str
     dropoff_location: str
-    total_miles: int
-    average_speed_mph: int
+    total_miles: Optional[int] = None 
+    average_speed_mph: int = 55  
     
     # Timing
-    planned_start_time: datetime
+    planned_start_time: Optional[datetime] = None
     
     def __post_init__(self):
         """Validate input data."""
         if self.current_cycle_used_hours < 0 or self.current_cycle_used_hours > 70:
             raise ValueError("current_cycle_used_hours must be between 0 and 70")
         
-        if self.total_miles <= 0:
-            raise ValueError("total_miles must be positive")
+        if self.total_miles is not None and self.total_miles <= 0:
+            raise ValueError("total_miles must be positive if provided")
         
         if self.average_speed_mph <= 0 or self.average_speed_mph > 100:
             raise ValueError("average_speed_mph must be between 1 and 100")

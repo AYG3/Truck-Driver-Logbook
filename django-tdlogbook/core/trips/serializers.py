@@ -10,6 +10,11 @@ class TripPlanSerializer(serializers.Serializer):
     This is NOT a ModelSerializer because trip planning is a behavioral
     endpoint, not a simple CRUD operation. The input doesn't map 1:1 to
     the Trip model - we need additional fields for the HOS engine.
+    
+    Miles and average speed are calculated/defaulted by the backend:
+    - Miles: Calculated from route via OSRM
+    - Average speed: Defaults to 55 mph
+    - Planned start time: Optional, defaults to midnight
     """
     
     driver_id = serializers.IntegerField(
@@ -32,20 +37,13 @@ class TripPlanSerializer(serializers.Serializer):
     )
     
     planned_start_time = serializers.DateTimeField(
-        help_text="When the driver plans to start (ISO 8601 format, UTC)"
+        required=False,
+        allow_null=True,
+        help_text="When the driver plans to start (ISO 8601 format, UTC). Defaults to midnight if not provided."
     )
     
     current_cycle_used_hours = serializers.FloatField(
         help_text="Hours already used in current 70-hour/8-day cycle"
-    )
-    
-    total_miles = serializers.IntegerField(
-        help_text="Total trip distance in miles"
-    )
-    
-    average_speed_mph = serializers.IntegerField(
-        default=55,
-        help_text="Average driving speed (default: 55 mph)"
     )
     
     def validate_driver_id(self, value):
@@ -60,22 +58,6 @@ class TripPlanSerializer(serializers.Serializer):
             raise serializers.ValidationError("Cycle hours cannot be negative")
         if value > 70:
             raise serializers.ValidationError("Cycle hours cannot exceed 70")
-        return value
-    
-    def validate_total_miles(self, value):
-        """Validate distance is reasonable."""
-        if value <= 0:
-            raise serializers.ValidationError("Distance must be positive")
-        if value > 5000:
-            raise serializers.ValidationError("Distance seems unrealistic (max 5000 miles)")
-        return value
-    
-    def validate_average_speed_mph(self, value):
-        """Validate speed is reasonable."""
-        if value <= 0:
-            raise serializers.ValidationError("Speed must be positive")
-        if value > 80:
-            raise serializers.ValidationError("Speed cannot exceed 80 mph")
         return value
 
 

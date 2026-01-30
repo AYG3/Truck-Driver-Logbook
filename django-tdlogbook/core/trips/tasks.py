@@ -217,26 +217,31 @@ def generate_logs_for_trip(self, trip_id: int, plan_data: dict):
     """
     Generate HOS logs for a trip asynchronously.
     
-    This is the bridge between the HOS engine (pure Python) and Django models.
-    
-    IMPORTANT: This function uses atomic transactions.
-    If any step fails, no partial logs are saved.
+    Uses the route-aware planner that:
+    - Calculates route and miles via OSRM
+    - Places HOS-compliant stops (breaks, rests, fuel every 1000 miles)
+    - Generates logbook records with exact locations
     
     Args:
         trip_id: ID of the Trip to generate logs for
-        plan_data: Dictionary containing TripPlanInput fields
+        plan_data: Dictionary containing:
+            - driver_id: int
+            - current_cycle_used_hours: float  
+            - current_location: str
+            - pickup_location: str
+            - dropoff_location: str
+            - average_speed_mph: int (default 55)
+            - planned_start_time: str (ISO format)
         
     Process:
         1. Retrieve Trip from database
         2. Mark as PROCESSING
-        3. Call HOS engine to generate duty events
-        4. VALIDATE generated events (legal compliance)
-        5. Split events into log days
-        6. VALIDATE log days (24-hour coverage)
-        7. Delete existing logs (regeneration strategy)
-        8. Create LogDay and DutySegment records atomically
-        9. Mark as COMPLETED or FAILED
+        3. Call route planner (calculates miles, places stops)
+        4. Generate logbook records
+        5. Mark as COMPLETED or FAILED
     """
+    from core.routes.route_planner import plan_trip_with_route, RoutePlannerError
+    from core.routes.services import GeocodingError, RoutingError
     
     trip = None
     
@@ -249,101 +254,44 @@ def generate_logs_for_trip(self, trip_id: int, plan_data: dict):
         # ====================================================================
         trip.mark_processing()
         logger.info(
-            "Starting log generation for trip %s (driver: %s, %s → %s)",
+            "Starting route-aware log generation for trip %s (driver: %s, %s → %s)",
             trip_id, trip.driver.name, trip.pickup_location, trip.dropoff_location
         )
         
         # Convert ISO string back to datetime
-        plan_data['planned_start_time'] = datetime.fromisoformat(
-            plan_data['planned_start_time']
+        start_time = datetime.fromisoformat(plan_data['planned_start_time'])
+        
+        # ====================================================================
+        # STEP 2: Plan route and generate logs via route planner
+        # This calculates miles, places HOS-compliant stops, and persists logs
+        # ====================================================================
+        logger.info("Planning route for trip %s", trip_id)
+        
+        result = plan_trip_with_route(
+            trip_id=trip_id,
+            origin=plan_data['current_location'],
+            pickup_location=plan_data['pickup_location'],
+            dropoff_location=plan_data['dropoff_location'],
+            start_time=start_time,
+            current_cycle_hours=plan_data.get('current_cycle_used_hours', 0),
+            average_speed_mph=plan_data.get('average_speed_mph', 55),
         )
         
-        # Create TripPlanInput DTO
-        trip_input = TripPlanInput(**plan_data)
-        
-        # ====================================================================
-        # STEP 2: Generate duty events using HOS engine
-        # ====================================================================
-        logger.info("Generating duty events for trip %s", trip_id)
-        events = generate_duty_events(trip_input)
-        logger.info("Generated %d duty events for trip %s", len(events), trip_id)
-        
-        # ====================================================================
-        # STEP 3: Split events into calendar days
-        # ====================================================================
-        log_days_data = split_events_into_log_days(events)
         logger.info(
-            "Split events into %d log days for trip %s",
-            len(log_days_data), trip_id
-        )
-        
-        # ====================================================================
-        # STEP 4: VALIDATE before persistence
-        # This ensures legal compliance - if this fails, nothing is saved
-        # ====================================================================
-        logger.info("Validating HOS compliance for trip %s", trip_id)
-        validate_before_persistence(
-            events=events,
-            log_days=log_days_data,
-            current_cycle_hours=plan_data.get('current_cycle_used_hours', 0)
-        )
-        logger.info("HOS validation passed for trip %s", trip_id)
-        
-        # ====================================================================
-        # STEP 5: Persist to database (ATOMIC TRANSACTION)
-        # ====================================================================
-        with transaction.atomic():
-            # REGENERATION STRATEGY: Delete existing logs first
-            # This ensures we never have stale or duplicate logs
-            deleted_count = _delete_existing_logs(trip)
-            if deleted_count > 0:
-                logger.info(
-                    "Deleted %d existing log days for trip %s (regeneration)",
-                    deleted_count, trip_id
-                )
-            
-            # Create new logs
-            for date_str, day_data in log_days_data.items():
-                # Create LogDay
-                log_day = LogDay.objects.create(
-                    trip=trip,
-                    date=day_data.date,
-                    total_driving_hours=day_data.total_driving_hours,
-                    total_on_duty_hours=day_data.total_on_duty_hours,
-                    total_off_duty_hours=day_data.total_off_duty_hours,
-                    total_sleeper_hours=day_data.total_sleeper_hours,
-                )
-                
-                # Create DutySegments for this day
-                segments_to_create = [
-                    DutySegment(
-                        log_day=log_day,
-                        start_time=event.start,
-                        end_time=event.end,
-                        status=event.status,
-                        city=event.city,
-                        state=event.state,
-                        remark=event.remark,
-                    )
-                    for event in day_data.segments
-                ]
-                
-                # Bulk create for performance
-                DutySegment.objects.bulk_create(segments_to_create)
-        
-        # ====================================================================
-        # STEP 6: Mark as COMPLETED
-        # ====================================================================
-        trip.mark_completed()
-        logger.info(
-            "Successfully generated %d log days for trip %s",
-            len(log_days_data), trip_id
+            "Route-aware log generation completed for trip %s: "
+            "%.1f miles, %d stops, %d log days",
+            trip_id,
+            result['route']['distance_miles'],
+            result['route']['stops_count'],
+            result['logbook']['log_days_count'],
         )
         
         return {
             'status': 'success',
             'trip_id': trip_id,
-            'log_days_generated': len(log_days_data),
+            'log_days_generated': result['logbook']['log_days_count'],
+            'distance_miles': result['route']['distance_miles'],
+            'total_stops': result['route']['stops_count'],
         }
         
     except Trip.DoesNotExist:
@@ -353,31 +301,62 @@ def generate_logs_for_trip(self, trip_id: int, plan_data: dict):
             'message': f'Trip {trip_id} not found'
         }
     
-    except HOSException as e:
-        # HOS validation failures are NOT retried
-        # They indicate invalid input, not transient errors
-        error_msg = f"HOS violation: {str(e)}"
-        logger.warning(
-            "HOS validation failed for trip %s: %s",
-            trip_id, error_msg
-        )
+    except GeocodingError as e:
+        error_msg = f"Could not find location: {str(e)}"
+        logger.warning("Geocoding failed for trip %s: %s", trip_id, error_msg)
         
         if trip:
             trip.mark_failed(error_msg)
         
-        # Don't retry HOS violations - they require user intervention
+        return {
+            'status': 'error',
+            'error_type': 'geocoding_error',
+            'message': str(e),
+        }
+    
+    except RoutingError as e:
+        error_msg = f"Could not calculate route: {str(e)}"
+        logger.warning("Routing failed for trip %s: %s", trip_id, error_msg)
+        
+        if trip:
+            trip.mark_failed(error_msg)
+        
+        return {
+            'status': 'error',
+            'error_type': 'routing_error',
+            'message': str(e),
+        }
+    
+    except RoutePlannerError as e:
+        error_msg = f"Route planning failed: {str(e)}"
+        logger.warning("Route planning failed for trip %s: %s", trip_id, error_msg)
+        
+        if trip:
+            trip.mark_failed(error_msg)
+        
+        return {
+            'status': 'error',
+            'error_type': 'route_planner_error',
+            'message': str(e),
+        }
+    
+    except HOSException as e:
+        error_msg = f"HOS violation: {str(e)}"
+        logger.warning("HOS validation failed for trip %s: %s", trip_id, error_msg)
+        
+        if trip:
+            trip.mark_failed(error_msg)
+        
         return {
             'status': 'error',
             'error_type': 'hos_violation',
             'message': str(e),
-            'details': getattr(e, 'details', {})
         }
     
     except Exception as exc:
-        # Mark as failed before retry
         error_msg = f"Processing error: {str(exc)}"
         logger.error(
-            "Error generating logs for trip %s: %s",
+            "Error in log generation for trip %s: %s",
             trip_id, error_msg,
             exc_info=True
         )
@@ -385,7 +364,6 @@ def generate_logs_for_trip(self, trip_id: int, plan_data: dict):
         if trip:
             trip.mark_failed(error_msg)
         
-        # Retry on transient failures (database errors, etc.)
         raise self.retry(exc=exc)
 
 
