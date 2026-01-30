@@ -1,5 +1,6 @@
 import type { DutySegment } from "../../../types/log";
 import { timeToX, statusToY } from "./utils";
+import { PADDING } from "./constants";
 
 /**
  * Draw a single duty segment (horizontal line)
@@ -7,9 +8,11 @@ import { timeToX, statusToY } from "./utils";
 export function drawSegment(
   ctx: CanvasRenderingContext2D,
   segment: DutySegment,
-  canvasDate: string
+  canvasDate: string,
+  isFirstSegment: boolean = false
 ): void {
-  const xStart = timeToX(segment.start, canvasDate);
+
+  const xStart = isFirstSegment ? PADDING.left : timeToX(segment.start, canvasDate);
   const xEnd = timeToX(segment.end, canvasDate);
   const y = statusToY(segment.status);
 
@@ -64,7 +67,7 @@ export function drawAllSegments(
 
   segments.forEach((segment, index) => {
     // Draw the horizontal segment line
-    drawSegment(ctx, segment, canvasDate);
+    drawSegment(ctx, segment, canvasDate, index === 0);
 
     // Draw vertical transition to next segment (if exists)
     if (index < segments.length - 1) {
