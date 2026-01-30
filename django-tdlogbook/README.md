@@ -49,70 +49,60 @@ This system generates legal truck driver logs based on FMCSA (Federal Motor Carr
 
 ### Key Design Principles
 
-1. **Backend-Firs              # Backend (Django REST Framework)
+1. **Backend-First Business Logic**: HOS rules enforced at the backend to ensure compliance
+2. **Service Layer Architecture**: Clean separation between API, business logic, and data layers
+3. **Type Safety**: Comprehensive dataclasses for type checking and validation
+4. **Testability**: Pure functions in HOS engine enable thorough unit testing
+5. **Extensibility**: Plugin architecture for different cycle types and regulations
+
+## Project Structure
+
+```
+django-tdlogbook/              # Backend (Django REST Framework)
 ├── config/                    # Django settings and configuration
 │   ├── settings/
 │   │   ├── base.py           # Shared settings + logging
 │   │   ├── local.py          # Development settings
-│   │   └── production.py
-│   └── urls.py
+│   │   └── production.py     # Production settings
+│   └── urls.py               # URL routing
 │
 ├── core/
 │   ├── drivers/              # Driver management
+│   │   ├── models.py         # Driver model
+│   │   ├── serializers.py    # API serializers
+│   │   └── views.py          # REST endpoints
 │   ├── trips/                # Trip planning + status tracking
-│   │   ├── models.py         # Trip with route data
+│   │   ├── models.py         # Trip model with route data
 │   │   ├── services.py       # Trip orchestration
 │   │   └── views.py          # REST endpoints
 │   ├── logs/                 # Log storage and retrieval
-│   ├── routes/               # 🆕 Route planning service
+│   │   ├── models.py         # LogDay and DutySegment models
+│   │   ├── selectors.py      # Query logic
+│   │   └── views.py          # Log viewing endpoints
+│   ├── routes/               # Route planning service
 │   │   ├── services.py       # OpenRouteService integration
 │   │   ├── logbook_generator.py  # Convert routes to HOS logs
 │   │   ├── route_planner.py  # Stop insertion algorithm
 │   │   └── views.py          # Route planning API
 │   └── hos/                  # HOS engine (pure business logic)
 │       ├── engine.py         # Core log generation algorithm
-│       ├── rules.py          # FMCSA constants
-│       ├── types.py          # Data structures
+│       ├── rules.py          # FMCSA constants and limits
+│       ├── types.py          # Data structures (dataclasses)
 │       ├── validators.py     # Input validation
 │       ├── event_validators.py  # Output validation
 │       └── exceptions.py     # Domain exceptions
 │
 ├── tests/
-│   └── test_hos_rules.py     # HOS compliance tests
+│   └── test_hos_rules.py     # Comprehensive HOS compliance tests
 │
-├── manage.py
-└── requirements.txt
-
-react-tdlogbook/              # 🆕 Frontend (React + Vite)
-├── src/
-│   ├── api/                  # API client (axios)
-│   ├── components/
-│   │   ├── layout/          # Header, Layout (mobile-responsive)
-│   │   └── ui/              # Button, Card, Input, Select, Combobox
-│   ├── features/
-│   │   ├── dashboard/
-│   │   ├── logbook/
-│   │   ├── map/             # 🆕 RouteMap with Leaflet
-│   │   └── trip-planner/    # 🆕 TripForm, TripStatus
-│   ├── hooks/               # React Query hooks
-│   └── types/               # TypeScript types
-├── package.json
-└── vite.config.ts    # Data structures
-│       ├── validators.py  # Input validation
-│       ├── event_validators.py  # Output validation
-│       └── exceptions.py  # Domain exceptions
-│
-├── tests/
-│   └── test_hos_rules.py  # Comprehensive HOS compliance tests
-│
-├── .env.example        # Environment configuration template
 ├── manage.py
 └── requirements.txt
 ```
 
-## Assessment Assumptions
+## Prerequisites
 
-ThNode.js 18+ and npm
+- Python 3.13+
+- Node.js 18+ and npm (for frontend)
 - SQLite (default) or PostgreSQL
 
 ### Backend Setup
@@ -181,7 +171,16 @@ Frontend will run on `http://localhost:5173` (or 5174 if 5173 is taken)
    - Current Location: Type or select a city (e.g., "Dallas, TX")
    - Pickup Location: Type or select (e.g., "Dallas, TX" or "Same as current")
    - Dropoff Location: Type or select (e.g., "Atlanta, GA")
-   -Route Planning (New!)
+   - Planned Start Time: Choose date/time for trip start
+   - Total Miles: Enter distance
+   - Average Speed: Default 55 mph
+   - Current Cycle Hours: Hours already used in 70-hour cycle
+4. Click **Generate HOS-Compliant Route**
+5. View your route with automatic stops on the interactive map
+
+## API Endpoints
+
+### Route Planning
 
 - `POST /api/routes/plan/` - Calculate HOS-compliant route with stops
 
@@ -243,33 +242,6 @@ Example request:
 ```
 
 Response includes `trip_id`, `status`, and route data with stops.
-### Trip Planning
-
-- `POST /api/trips/plan/` - Plan a trip and generate logs
-- `GET /api/trips/{id}/status/` - Poll processing status
-
-Example request:
-```json
-{
-  "driver_id": 1,
-  "current_location": "Richmond, VA",
-  "pickup_location": "Richmond, VA",
-  "dropoff_location": "Philadelphia, PA",
-  "planned_start_time": "2026-01-27T06:00:00Z",
-  "current_cycle_used_hours": 42.5,
-  "total_miles": 280,
-  "average_speed_mph": 55
-}
-```
-
-Status response:
-```json
-{
-  "trip_id": 1,
-  "status": "COMPLETED",
-  "error": null
-}
-```
 
 ### Logs
 
@@ -335,13 +307,18 @@ curl http://localhost:8000/api/logs/trip/1/
 
 ## HOS Engine Details
 
-The HOS engine (`core/hos/engine.py`) implements the following algorithm:
+The HOS engine ([core/hos/engine.py](core/hos/engine.py)) implements the following algorithm:
 
 1. **Pickup Phase**: 1-hour ON_DUTY for loading
 2. **Driving Phase**: 
    - Drive in blocks (max 2 hours continuous)
    - Add fuel stops every 1000 miles
-   Technology Stack
+   - Insert 30-minute breaks after 8 hours of driving
+   - Insert 10-hour rest when limits are reached (11-hour drive or 14-hour window)
+3. **Dropoff Phase**: 1-hour ON_DUTY for unloading
+4. **Validation**: Comprehensive checks for all FMCSA regulations
+
+## Technology Stack
 
 ### Backend
 - Django 4.2 + Django REST Framework
@@ -378,6 +355,17 @@ The route planning system calculates HOS-compliant routes by:
 | REST | 🟣 Purple | 10-hour sleeper berth rest |
 | DROPOFF | 🔴 Red | Delivery dropoff location |
 
+## Data Model
+
+```
+Driver (1) → (N) Trip (1) → (N) LogDay (1) → (N) DutySegment
+```
+
+- **Driver**: Name and cycle type
+- **Trip**: Planning input (locations, times, cycle hours used)
+- **LogDay**: One 24-hour log sheet with daily totals
+- **DutySegment**: Individual duty status periods (OFF_DUTY, SLEEPER, DRIVING, ON_DUTY)
+
 ## Future Enhancements
 
 - [x] Real route planning with APIs ✅
@@ -392,34 +380,15 @@ The route planning system calculates HOS-compliant routes by:
 - [ ] Multi-day trip planning
 - [ ] Driver dashboard with current HOS status
 
-```
-Driver (1) → (N) Trip (1) → (N) LogDay (1) → (N) DutySegment
-```
-
-- **Driver**: Name and cycle type
-- **Trip**: Planning input (locations, times, cycle hours used)
-- **LogDay**: One 24-hour log sheet with daily totals
-- **DutySegment**: Individual duty status periods (OFF_DUTY, SLEEPER, DRIVING, ON_DUTY)
-
 ## Compliance Notes
 
 This system enforces FMCSA Part 395 Hours of Service regulations:
 
-- **§395.3**: Maximum driving time (11 hours)
-- **§395.3(a)(2)**: 30-minute break requirement
-- **§395.3(a)(3)(ii)**: 14-hour on-duty window
+- **§395.3(a)(1)**: Maximum driving time (11 hours)
+- **§395.3(a)(2)**: 14-hour on-duty window
+- **§395.3(a)(3)(ii)**: 30-minute break requirement
 - **§395.3(b)**: 70-hour/8-day cycle limit
 - **§395.3(c)**: 10-hour minimum off-duty time
-
-## Future Enhancements
-
-- [ ] Authentication and authorization
-- [ ] 60-hour/7-day cycle support
-- [ ] Split sleeper berth provisions
-- [ ] ELD (Electronic Logging Device) integration
-- [ ] Real route planning with APIs (Google Maps, etc.)
-- [ ] Violation detection and warnings
-- [ ] Export to PDF (official log format)
 
 ## Error Handling
 

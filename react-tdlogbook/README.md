@@ -7,10 +7,12 @@ React + TypeScript frontend for the FMCSA-compliant Hours of Service (HOS) logbo
 - **🗺️ Interactive Route Planning**: Plan HOS-compliant trips with automatic break and rest stop calculation
 - **📍 Smart Location Input**: Combobox with 40+ common US trucking cities, with autocomplete filtering and custom input support
 - **🗾 Live Map Visualization**: View routes on interactive Leaflet maps with color-coded stop markers
-- **⚡ Real-time Route Preview**: See your planned route on the map before submitting
+- **⚡ Real-time Route Preview**: See your planned route on the map as you type (debounced for performance)
 - **📱 Mobile-Responsive Design**: Fully optimized for mobile devices with hamburger menu navigation
-- **🔄 Optimistic Updates**: React Query for efficient data fetching and caching
-- **🎨 Modern UI**: TailwindCSS with polished components and animations
+- **🔄 Optimistic Updates**: React Query for efficient data fetching, caching, and synchronization
+- **🎨 Modern UI**: TailwindCSS with polished components, smooth animations, and consistent design
+- **⌨️ Keyboard Navigation**: Full keyboard support in comboboxes and forms
+- **🚨 Toast Notifications**: Real-time feedback for user actions with Sonner
 
 ## Technology Stack
 
@@ -192,7 +194,7 @@ POST /api/trips/plan/
   average_speed_mph: 55
 }
 
-// Preview route
+// Preview route (called during form input for live map updates)
 POST /api/routes/plan/
 {
   origin: "Dallas, TX",
@@ -201,9 +203,17 @@ POST /api/routes/plan/
   average_speed_mph: 55
 }
 
-// Get trip route
+// Get trip route with stops and geometry
 GET /api/trips/{id}/route/
 ```
+
+### API Client Configuration
+
+The API client ([src/api/client.ts](src/api/client.ts)) includes:
+- Axios instance with base URL configuration
+- Request/response interceptors for error handling
+- Automatic toast notifications for API errors
+- CORS support for local development
 
 ## Common Locations
 
