@@ -46,3 +46,5 @@ celerybeat.pid
 !README.md
 
 ./db.sqlite3
+
+./clear.py

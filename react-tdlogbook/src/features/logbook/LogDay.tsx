@@ -1,5 +1,5 @@
 import { LogHeader } from "./LogHeader";
-import { LogCanvas } from "./LogCanvas";
+import { LogCanvas } from "./canvas";
 import { LogRemarks } from "./LogRemarks";
 import type { LogDay as LogDayType } from "../../types/log";
 import { LogSummaryTable } from "./LogSummaryTable";
