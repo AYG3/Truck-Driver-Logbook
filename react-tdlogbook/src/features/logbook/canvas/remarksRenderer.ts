@@ -38,8 +38,8 @@ export function drawRemarkBracket(
   ctx.lineWidth = 1.5;
   ctx.lineCap = "square";
 
-  const slantHeight = 12; // Height of slanted lines
-  const slantWidth = 6;   // Horizontal offset for slant
+  const slantHeight = 20; // Height of slanted lines
+  const slantWidth = 0;   // Horizontal offset for slant
 
   ctx.beginPath();
   // Left slant: from top-left down to bottom-left
@@ -57,8 +57,8 @@ export function drawRemarkBracket(
 
 /**
  * Draw remark label (location + activity)
- * Format: "City, ST | Activity" with separator
- * Renders text vertically (rotated 90 degrees) with slant
+ * Format: "City - Activity"
+ * Renders text upright
  */
 export function drawRemarkLabel(
   ctx: CanvasRenderingContext2D,
@@ -87,35 +87,21 @@ export function drawRemarkLabel(
   ctx.translate(xMid, y);
   
   // Rotate 90 degrees clockwise (Math.PI / 2)
-  ctx.rotate(Math.PI / 2);
+  ctx.rotate(- (Math.PI / 2));
   
   // Add slight slant (rotate an additional 5 degrees)
-  ctx.rotate(5 * Math.PI / 180);
+  ctx.rotate(70 * Math.PI / 180);
   
   // Configure text style
   ctx.font = `${fontWeight} ${fontSize}px system-ui, -apple-system, Arial, sans-serif`;
   ctx.fillStyle = "#000000";
-  ctx.textAlign = "left";
+  ctx.textAlign = "right";
   ctx.textBaseline = "middle";
   
-  // Draw location and remark with separator
+  // Draw location and remark
   if (location && cleanRemark) {
-    // Draw location
-    ctx.fillText(location, 0, 0);
-    
-    // Measure location width to position separator
-    const locationWidth = ctx.measureText(location).width;
-    
-    // Draw separator line
-    const separatorX = locationWidth + 4;
-    const separatorLength = 10;
-    ctx.beginPath();
-    ctx.moveTo(separatorX, -separatorLength / 2);
-    ctx.lineTo(separatorX, separatorLength / 2);
-    ctx.stroke();
-    
-    // Draw remark after separator
-    ctx.fillText(cleanRemark, separatorX + 8, 0);
+    const text = `${location} - ${cleanRemark} –`;
+    ctx.fillText(text, 0, 0);
   } else {
     // Just remark or just location
     const text = location || cleanRemark;
