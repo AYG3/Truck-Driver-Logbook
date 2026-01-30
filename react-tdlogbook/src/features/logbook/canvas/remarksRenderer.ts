@@ -12,7 +12,13 @@ export function shouldRenderRemark(segment: DutySegment): boolean {
   
   // Skip generic auto-filled remarks
   const remark = segment.remark.toLowerCase();
-  if (remark.includes("auto-filled") || remark === "off duty") return false;
+  if (remark.includes("auto-filled")) return false;
+  
+  // Skip continuation remarks from previous day
+  if (remark.includes("cont'd from prev day") || remark.includes("trip complete")) return false;
+  
+  // Skip generic "off duty" with no additional context
+  if (remark === "off duty") return false;
   
   // Show for: ON_DUTY (pickup, dropoff, fuel), OFF_DUTY (breaks), SLEEPER (rest)
   // Skip: DRIVING (unless it's a short notable segment)

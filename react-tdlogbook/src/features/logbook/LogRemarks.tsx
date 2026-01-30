@@ -7,6 +7,26 @@ interface LogRemarksProps {
 }
 
 /**
+ * Filter out generic/auto-filled remarks that shouldn't be displayed
+ */
+function shouldDisplayRemark(remark: string | undefined): boolean {
+  if (!remark || !remark.trim()) return false;
+  
+  const remarkLower = remark.toLowerCase();
+  
+  // Skip auto-filled remarks
+  if (remarkLower.includes("auto-filled")) return false;
+  
+  // Skip continuation remarks from previous day
+  if (remarkLower.includes("cont'd from prev day") || remarkLower.includes("trip complete")) return false;
+  
+  // Skip generic "off duty" with no additional context
+  if (remarkLower === "off duty") return false;
+  
+  return true;
+}
+
+/**
  * LogRemarks - Activity remarks section for a log day
  * Lists each duty status change with location and remarks
  * Mirrors the "Remarks" section of a paper logbook
@@ -77,7 +97,7 @@ export function LogRemarks({ segments }: LogRemarksProps) {
 
                 {/* Remarks */}
                 <div className="col-span-4 text-gray-500">
-                  {segment.remark || "—"}
+                  {shouldDisplayRemark(segment.remark) ? segment.remark : "—"}
                 </div>
               </div>
             );
